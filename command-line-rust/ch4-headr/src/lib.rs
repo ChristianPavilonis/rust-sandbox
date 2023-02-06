@@ -1,7 +1,7 @@
 use clap::{App, Arg};
-use std::error::Error;
+use std::{error::Error, io::{BufRead, BufReader, self}, fs::File};
 
-type MyReslut<T> = Result<T, Box<dyn Error>>;
+type MyResult<T> = Result<T, Box<dyn Error>>;
 
 #[derive(Debug)]
 pub struct Config {
@@ -10,7 +10,7 @@ pub struct Config {
     bytes: Option<usize>,
 }
 
-pub fn get_args() -> MyReslut<Config> {
+pub fn get_args() -> MyResult<Config> {
     let matches = App::new("headr")
         .version("0.1.0")
         .author("your mom")
@@ -42,22 +42,18 @@ pub fn get_args() -> MyReslut<Config> {
         .get_matches();
 
     let files = matches.values_of_lossy("files").unwrap();
-    let lines = match parse_positive_int(matches.value_of("lines").unwrap()) {
-        Ok(n) => n,
-        Err(invalid) => {
-            return Err(format!("illegal line count -- {}", invalid).into());
-        }
-    };
+    let lines = matches
+        .value_of("lines")
+        .map(parse_positive_int)
+        .transpose()
+        .map_err(|e| format!("illegal line count -- {e}"))?
+        .unwrap();
 
-    let bytes = match matches.value_of("bytes") {
-        Some(value) => match parse_positive_int(value) {
-            Ok(n) => Some(n),
-            Err(invalid) => {
-                return Err(format!("illegal byte count -- {}", invalid).into());
-            }
-        },
-        None => None,
-    };
+    let bytes = matches
+        .value_of("bytes")
+        .map(parse_positive_int)
+        .transpose()
+        .map_err(|e| format!("illegal byte count -- {e}"))?;
 
     Ok(Config {
         files,
@@ -66,13 +62,18 @@ pub fn get_args() -> MyReslut<Config> {
     })
 }
 
-pub fn run(config: Config) -> MyReslut<()> {
-    dbg!(config);
+pub fn run(config: Config) -> MyResult<()> {
+    for filename in config.files {
+        match open(&filename) {
+            Err(err) => eprintln!("{filename}, {err}"),
+            Ok(_) => println!("Opened {filename}"),
+        }
+    }
 
     Ok(())
 }
 
-fn parse_positive_int(val: &str) -> MyReslut<usize> {
+fn parse_positive_int(val: &str) -> MyResult<usize> {
     match val.parse() {
         Ok(number) if number > 0 => Ok(number),
         _ => Err(val.into()),
@@ -95,4 +96,11 @@ fn test_parse_positive_int() {
     let res = parse_positive_int("0");
     assert!(res.is_err());
     assert_eq!(res.unwrap_err().to_string(), "0".to_string());
+}
+
+fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+    }
 }
