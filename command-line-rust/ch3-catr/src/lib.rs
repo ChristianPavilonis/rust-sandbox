@@ -12,16 +12,15 @@ pub struct Config {
     number_nonblank_lines: bool,
 }
 
-// --------------------------------------------------
 pub fn get_args() -> MyResult<Config> {
     let matches = App::new("catr")
         .version("0.1.0")
-        .author("Ken Youens-Clark <kyclark@gmail.com>")
+        .author("Christian Pav <_@christians.email>")
         .about("Rust cat")
         .arg(
             Arg::with_name("files")
-                .value_name("FILE")
-                .help("Input file(s)")
+                .value_name("FILES")
+                .help("Input files")
                 .multiple(true)
                 .default_value("-"),
         )
@@ -49,26 +48,30 @@ pub fn get_args() -> MyResult<Config> {
     })
 }
 
-// --------------------------------------------------
 pub fn run(config: Config) -> MyResult<()> {
     for filename in config.files {
         match open(&filename) {
-            Err(e) => eprintln!("{}: {}", filename, e),
+            Err(error) => eprintln!("Failed to open {filename}: {error}"),
             Ok(file) => {
-                let mut last_num = 0;
-                for (line_num, line_result) in file.lines().enumerate() {
-                    let line = line_result?;
+                let mut current_line = 0;
+
+                for line in file.lines().into_iter() {
+                    let line = line?;
+
+
                     if config.number_lines {
-                        println!("{:6}\t{}", line_num + 1, line);
+                        current_line += 1;
+                        println!("{:6}\t{}", current_line, line);
                     } else if config.number_nonblank_lines {
-                        if !line.is_empty() {
-                            last_num += 1;
-                            println!("{:6}\t{}", last_num, line);
-                        } else {
+                        if line.trim().is_empty() {
                             println!();
+                        } else {
+                            current_line += 1;
+                            println!("{:6}\t{}", current_line, line);
                         }
-                    } else {
-                        println!("{}", line);
+                    }
+                    else {
+                        println!("{line}");
                     }
                 }
             }
@@ -77,7 +80,6 @@ pub fn run(config: Config) -> MyResult<()> {
     Ok(())
 }
 
-// --------------------------------------------------
 fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
     match filename {
         "-" => Ok(Box::new(BufReader::new(io::stdin()))),
