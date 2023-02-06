@@ -1,5 +1,9 @@
 use clap::{App, Arg};
-use std::{error::Error, io::{BufRead, BufReader, self}, fs::File};
+use std::{
+    error::Error,
+    fs::File,
+    io::{self, BufRead, BufReader, Read},
+};
 
 type MyResult<T> = Result<T, Box<dyn Error>>;
 
@@ -63,10 +67,42 @@ pub fn get_args() -> MyResult<Config> {
 }
 
 pub fn run(config: Config) -> MyResult<()> {
-    for filename in config.files {
+    let multiple = config.files.len() > 1;
+
+    for (file_num, filename) in config.files.iter().enumerate() {
         match open(&filename) {
-            Err(err) => eprintln!("{filename}, {err}"),
-            Ok(_) => println!("Opened {filename}"),
+            Err(err) => eprintln!("{filename}: {err}"),
+            Ok(mut file) => {
+                if multiple {
+                    println!(
+                        "{}==> {} <==",
+                        if file_num > 0 { "\n" } else { "" },
+                        filename
+                    );
+                }
+
+                if let Some(bytes) = config.bytes {
+                    let mut result: Vec<u8> = Vec::new();
+
+                    for byte in file.bytes().take(bytes) {
+                        let byte = byte.unwrap();
+                        result.push(byte);
+                    }
+
+                    print!("{}", String::from_utf8_lossy(&result))
+                } else {
+                    let mut line = String::new();
+                    for _ in 0..config.lines {
+                        let bytes = file.read_line(&mut line)?;
+                        if bytes == 0 {
+                            break;
+                        }
+
+                        print!("{}", line);
+                        line.clear();
+                    }
+                }
+            }
         }
     }
 
