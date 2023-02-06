@@ -53,21 +53,19 @@ pub fn run(config: Config) -> MyResult<()> {
         match open(&filename) {
             Err(error) => eprintln!("Failed to open {filename}: {error}"),
             Ok(file) => {
-                let mut current_line = 0;
+                let mut last_num = 0;
 
-                for line in file.lines().into_iter() {
+                for (line_num, line) in file.lines().enumerate() {
                     let line = line?;
 
-
                     if config.number_lines {
-                        current_line += 1;
-                        println!("{:6}\t{}", current_line, line);
+                        println!("{:6}\t{}", line_num + 1, line);
                     } else if config.number_nonblank_lines {
                         if line.trim().is_empty() {
                             println!();
                         } else {
-                            current_line += 1;
-                            println!("{:6}\t{}", current_line, line);
+                            last_num += 1;
+                            println!("{:6}\t{}", last_num, line);
                         }
                     }
                     else {
