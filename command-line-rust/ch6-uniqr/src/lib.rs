@@ -55,54 +55,43 @@ pub fn get_args() -> MyResult<Config> {
 pub fn run(config: Config) -> MyResult<()> {
     let mut file = open(&config.in_file).map_err(|e| format!("{}: {}", config.in_file, e))?;
 
+    let mut out_file : Box<dyn Write> = match &config.out_file {
+        Some(out_path) => Box::new(File::create(out_path)?),
+        None => Box::new(io::stdout()),
+    };
+
+    let mut print = |count:u64, text: &str| -> MyResult<()> {
+        if count > 0 {
+            if config.count {
+                write!(out_file, "{:>4} {}", count, text)?;
+            } else {
+                write!(out_file, "{}", text)?;
+            }
+        }
+        Ok(())
+    };
+
     let mut line = String::new();
     let mut prev_line = String::new();
-    let mut occurrences: usize = 1;
-    let mut first_loop = true;
-    let mut output = String::new();
+    let mut count: u64 = 0;
 
     loop {
         let bytes = file.read_line(&mut line)?;
         if bytes == 0 {
-            if ! prev_line.is_empty() {
-                output = format!("{}{}", output, format(&config, occurrences, prev_line));
-            }
             break;
         }
 
-        if line.trim() == prev_line.trim() {
-            occurrences += 1;
-        } else {
-            if first_loop {
-                first_loop = false;
-            } else {
-
-                output = format!("{}{}", output, format(&config, occurrences, prev_line));
-                occurrences = 1
-            }
-
+        if line.trim() != prev_line.trim() {
+            print(count, &prev_line)?;
             prev_line = line.clone();
+            count = 0;
         }
-
+        count += 1;
         line.clear();
     }
+    print(count, &prev_line)?;
 
-    match config.out_file {
-        Some(path) => {
-            let mut file = File::create(&path)?;
-            write!(file, "{}", output);
-        }
-        None => print!("{}", output),
-    }
     Ok(())
-}
-
-fn format(config: &Config, occurrences: usize, line: String) -> String {
-    if config.count {
-        format!("{:>4} {}", occurrences, line)
-    } else {
-        format!("{}", line)
-    }
 }
 
 fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
