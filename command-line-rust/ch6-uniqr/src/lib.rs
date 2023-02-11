@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fs::File,
-    io::{self, BufRead, BufReader, Read},
+    io::{self, BufRead, BufReader, Read, Write},
 };
 
 use clap::{App, Arg};
@@ -35,7 +35,8 @@ pub fn get_args() -> MyResult<Config> {
             Arg::with_name("count")
                 .value_name("COUNT")
                 .short("c")
-                .long("count"),
+                .long("count")
+                .takes_value(false),
         )
         .get_matches();
 
@@ -55,17 +56,53 @@ pub fn run(config: Config) -> MyResult<()> {
     let mut file = open(&config.in_file).map_err(|e| format!("{}: {}", config.in_file, e))?;
 
     let mut line = String::new();
+    let mut prev_line = String::new();
+    let mut occurrences: usize = 1;
+    let mut first_loop = true;
+    let mut output = String::new();
 
     loop {
         let bytes = file.read_line(&mut line)?;
         if bytes == 0 {
+            if ! prev_line.is_empty() {
+                output = format!("{}{}", output, format(&config, occurrences, prev_line));
+            }
             break;
         }
-        print!("{}", line);
+
+        if line.trim() == prev_line.trim() {
+            occurrences += 1;
+        } else {
+            if first_loop {
+                first_loop = false;
+            } else {
+
+                output = format!("{}{}", output, format(&config, occurrences, prev_line));
+                occurrences = 1
+            }
+
+            prev_line = line.clone();
+        }
+
         line.clear();
     }
 
+    match config.out_file {
+        Some(path) => {
+            let mut file = File::create(&path)?;
+            write!(file, "{}", output);
+        }
+        None => print!("{}", output),
+    }
     Ok(())
+}
+
+fn format(config: &Config, occurrences: usize, line: String) -> String {
+    if config.count {
+        format!("{:>4} {}", occurrences, line)
+    } else {
+        format!("{}", line)
+    }
 }
 
 fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
