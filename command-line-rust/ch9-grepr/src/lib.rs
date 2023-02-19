@@ -89,7 +89,15 @@ pub fn get_args() -> MyResult<Config> {
 
 pub fn run(config: Config) -> MyResult<()> {
     let entries = find_files(&config.files, config.recursive);
-    let include_path = config.files.len() > 1 || config.recursive;
+    let num_files = entries.len();
+
+    let print = |fname: &str, val: &str| {
+        if num_files > 1 {
+            print!("{}:{}", fname, val);
+        } else {
+            print!("{}", val);
+        }
+    };
 
     for entry in entries {
         match entry {
@@ -97,22 +105,13 @@ pub fn run(config: Config) -> MyResult<()> {
             Ok(filename) => match open(&filename) {
                 Err(e) => eprintln!("{}: {}", filename, e),
                 Ok(file) => {
-                    let lines = find_lines(file, &config.pattern, config.invert_match);
+                    let lines = find_lines(file, &config.pattern, config.invert_match)?;
 
                     if config.count {
-                        if include_path {
-                            println!("{}:{}", filename, lines?.len());
-                        } else {
-                            println!("{}", lines?.len());
-                        }
-                        continue;
-                    }
-
-                    for line in lines?.iter() {
-                        if include_path {
-                            println!("{}:{}", filename, line);
-                        } else {
-                            println!("{}", line);
+                        print(&filename, &format!("{}\n", lines.len()))
+                    } else {
+                        for line in lines.iter() {
+                            print(&filename, &line);
                         }
                     }
                 }
@@ -141,10 +140,7 @@ fn find_files(paths: &[String], recursive: bool) -> Vec<MyResult<String>> {
                     if recursive {
                         WalkDir::new(path)
                             .into_iter()
-                            .filter_map(|e| match e {
-                                Err(e) => None,
-                                Ok(entry) => Some(entry),
-                            })
+                            .flatten()
                             .filter(|entry| entry.file_type().is_file())
                             .for_each(|entry| {
                                 results.push(Ok(entry.path().display().to_string()));
@@ -170,27 +166,19 @@ fn find_lines<T: BufRead>(
     pattern: &Regex,
     invert_match: bool,
 ) -> MyResult<Vec<String>> {
-    let matches = file
-        .lines()
-        .filter_map(|line| {
-            let value = match line {
-                Err(_) => return None,
-                Ok(value) => value,
-            };
+    let mut matches = vec![];
+    let mut line = String::new();
 
-            let should_add = if invert_match {
-                !pattern.is_match(&value)
-            } else {
-                pattern.is_match(&value)
-            };
-
-            if should_add {
-                Some(value)
-            } else {
-                None
-            }
-        })
-        .collect();
+    loop {
+        let bytes = file.read_line(&mut line)?;
+        if bytes == 0 {
+            break;
+        }
+        if pattern.is_match(&line) ^ invert_match {
+            matches.push(mem::take(&mut line));
+        }
+        line.clear();
+    }
 
     Ok(matches)
 }
