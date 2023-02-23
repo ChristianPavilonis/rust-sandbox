@@ -141,23 +141,22 @@ fn print_lines(mut file: impl BufRead, num_lines: &TakeValue, total_lines: i64) 
     match start_index {
         None => Ok(()),
         Some(start) => {
-            let mut line = String::new();
-
             let mut count = 0;
+            let mut buf = Vec::new();
 
             loop {
-                let bytes = file.read_line(&mut line)?;
+                let bytes = file.read_until(b'\n', &mut buf)?;
 
                 if bytes == 0 {
                     break;
                 }
 
-                if count >= start {
-                    print!("{line}");
+                if count >= start { // only create a string when we need it.
+                    print!("{}", String::from_utf8_lossy(&buf));
                 }
 
                 count += 1;
-                line.clear();
+                buf.clear();
             }
 
             Ok(())
@@ -174,11 +173,16 @@ where
     match start_index {
         None => Ok(()),
         Some(start) => {
-            let bytes = file.bytes();
+            file.seek(SeekFrom::Start(start))?;
 
-            let collected: Vec<_> = bytes.skip(start as usize).flatten().collect();
+            let mut buffer = Vec::new();
 
-            print!("{}", String::from_utf8_lossy(&collected));
+            file.read_to_end(&mut buffer);
+
+
+            if !buffer.is_empty() {
+                print!("{}", String::from_utf8_lossy(&buffer));
+            }
 
             Ok(())
         }
