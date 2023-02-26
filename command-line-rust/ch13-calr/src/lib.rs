@@ -146,21 +146,17 @@ fn parse_month(month: &str) -> MyResult<u32> {
 fn format_month(year: i32, month: u32, print_year: bool, today: NaiveDate) -> Vec<String> {
     let mut cal = vec![];
 
-    let mo = MONTH_NAMES[(month - 1) as usize];
+    let month_name = MONTH_NAMES[(month - 1) as usize];
 
-    let line_width = LINE_WIDTH -2;
-
-    let head = format!(
-        "{:^line_width$}  ",
+    cal.push(format!(
+            "{:^width$}  ",
         if print_year {
-            format!("{mo} {year}")
+            format!("{month_name} {year}")
         } else {
-            format!("{mo}")
-        }
-    );
-
-    // push headers
-    cal.push(head);
+            format!("{month_name}")
+        },
+        width = LINE_WIDTH - 2
+    ));
     cal.push(format!("{}", "Su Mo Tu We Th Fr Sa  "));
 
     let mut iter = NaiveDate::from_ymd_opt(year, month, 1).unwrap().iter_days();
@@ -177,7 +173,7 @@ fn format_month(year: i32, month: u32, print_year: bool, today: NaiveDate) -> Ve
         loop {
             let date = iter.next().unwrap();
             let day = if today == date {
-                format!("\u{1b}[7m{:>2}\u{1b}[0m", date.day())
+                Style::new().reverse().paint(format!("{:>2}", date.day())).to_string()
             } else if date.month() == month {
                 date.day().to_string()
             } else {
