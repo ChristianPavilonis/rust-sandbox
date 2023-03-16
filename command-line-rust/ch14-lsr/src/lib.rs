@@ -2,6 +2,7 @@ mod owner;
 
 use chrono::{DateTime, Local};
 use clap::{App, Arg};
+use owner::Owner;
 //use owner::Owner;
 use std::{error::Error, fs, os::unix::fs::MetadataExt, path::PathBuf};
 use tabular::{Row, Table};
@@ -131,27 +132,12 @@ fn format_output(paths: &[PathBuf]) -> MyResult<String> {
 }
 
 fn format_mode(mode: u32) -> String {
-    let mut result = String::new();
-
-    let mut push_mode = |mask: u32, mode_str: &str| {
-        if mask != 0 {
-            result.push_str(mode_str)
-        } else {
-            result.push_str("-")
-        }
-    };
-
-    push_mode(mode & 0o400, "r");
-    push_mode(mode & 0o200, "w");
-    push_mode(mode & 0o100, "x");
-    push_mode(mode & 0o040, "r");
-    push_mode(mode & 0o020, "w");
-    push_mode(mode & 0o010, "x");
-    push_mode(mode & 0o004, "r");
-    push_mode(mode & 0o002, "w");
-    push_mode(mode & 0o001, "x");
-
-    result
+    format!(
+        "{}{}{}",
+        mk_triple(mode, Owner::User),
+        mk_triple(mode, Owner::Group),
+        mk_triple(mode, Owner::Other),
+    )
 }
 
 fn get_user_and_group(metadata: &fs::Metadata) -> (String, String) {
@@ -163,6 +149,16 @@ fn get_user_and_group(metadata: &fs::Metadata) -> (String, String) {
         .unwrap_or_default();
 
     (user, group)
+}
+
+fn mk_triple(mode: u32, owner: Owner) -> String {
+    let [read, write, execute] = owner.masks();
+    format!(
+        "{}{}{}",
+        if mode & read == 0 { "-" } else { "r" },
+        if mode & write == 0 { "-" } else { "w" },
+        if mode & execute == 0 { "-" } else { "x" },
+    )
 }
 
 #[cfg(test)]
@@ -306,13 +302,13 @@ mod test {
         long_match(&dir_line, "tests/inputs/dir", "drwxr-xr-x", None);
     }
 
-    //        #[test]
-    //        fn test_mk_triple() {
-    //            assert_eq!(mk_triple(0o751, Owner::User), "rwx");
-    //            assert_eq!(mk_triple(0o751, Owner::Group), "r-x");
-    //            assert_eq!(mk_triple(0o751, Owner::Other), "--x");
-    //            assert_eq!(mk_triple(0o600, Owner::Other), "---");
-    //        }
+    #[test]
+    fn test_mk_triple() {
+        assert_eq!(mk_triple(0o751, Owner::User), "rwx");
+        assert_eq!(mk_triple(0o751, Owner::Group), "r-x");
+        assert_eq!(mk_triple(0o751, Owner::Other), "--x");
+        assert_eq!(mk_triple(0o600, Owner::Other), "---");
+    }
 
     #[test]
     fn test_format_mode() {
