@@ -60,21 +60,36 @@
 //
 //});
 
-use macros::it;
+// use macros::it;
 
-fn main() {
+use macros::show_streams;
+
+fn main() {}
+
+// Example: Basic function
+#[show_streams(bar)]
+fn invoke1() {
+    println!("foo");
+    let x = 0;
 }
+
+// Example: Attribute with input
+// #[show_streams(bar)]
+// fn invoke2() {}
+
+// Example: Multiple tokens in the input
+// #[show_streams(multiple => tokens)]
+// fn invoke3() {}
+
+// #[show_streams { delimiters }]
+// fn invoke4() {}
 
 // proc macros
 
-
-
-
-fn sum(arg1: i32, arg2: i32) -> i32 {
-    arg1 + arg2
-}
-
-
-it!("does the thing", {
-    assert_eq!(2+2, 4);
-});
+// fn sum(arg1: i32, arg2: i32) -> i32 {
+//     arg1 + arg2
+// }
+//
+// it!("does the thing", {
+//     assert_eq!(2 + 2, 4);
+// });
